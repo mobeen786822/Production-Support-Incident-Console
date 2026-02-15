@@ -15,6 +15,7 @@ import {
   updateStatus,
   upsertRca,
 } from "./api";
+import CustomSelect from "./CustomSelect";
 import type { Incident, IncidentDetail, Metrics, Service, User } from "./types";
 
 const STATUS_CHAIN: Record<string, string[]> = {
@@ -204,34 +205,42 @@ export default function App() {
         <section className="dashboard-grid">
           <aside className="panel">
             <h2>Filters</h2>
-            <select value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
-              <option value="">All Statuses</option>
-              {Object.keys(STATUS_CHAIN).map((s) => (
-                <option key={s}>{s}</option>
-              ))}
-            </select>
-            <select value={filters.severity} onChange={(e) => setFilters({ ...filters, severity: e.target.value })}>
-              <option value="">All Severities</option>
-              {["SEV1", "SEV2", "SEV3", "SEV4"].map((s) => (
-                <option key={s}>{s}</option>
-              ))}
-            </select>
-            <select value={filters.service_id} onChange={(e) => setFilters({ ...filters, service_id: e.target.value })}>
-              <option value="">All Services</option>
-              {services.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-            <select value={filters.assignee_id} onChange={(e) => setFilters({ ...filters, assignee_id: e.target.value })}>
-              <option value="">All Owners</option>
-              {users.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name}
-                </option>
-              ))}
-            </select>
+            <CustomSelect
+              ariaLabel="Status filter"
+              value={filters.status}
+              onChange={(next) => setFilters({ ...filters, status: next })}
+              options={[
+                { value: "", label: "All Statuses" },
+                ...Object.keys(STATUS_CHAIN).map((s) => ({ value: s, label: s })),
+              ]}
+            />
+            <CustomSelect
+              ariaLabel="Severity filter"
+              value={filters.severity}
+              onChange={(next) => setFilters({ ...filters, severity: next })}
+              options={[
+                { value: "", label: "All Severities" },
+                ...["SEV1", "SEV2", "SEV3", "SEV4"].map((s) => ({ value: s, label: s })),
+              ]}
+            />
+            <CustomSelect
+              ariaLabel="Service filter"
+              value={filters.service_id}
+              onChange={(next) => setFilters({ ...filters, service_id: next })}
+              options={[
+                { value: "", label: "All Services" },
+                ...services.map((s) => ({ value: String(s.id), label: s.name })),
+              ]}
+            />
+            <CustomSelect
+              ariaLabel="Owner filter"
+              value={filters.assignee_id}
+              onChange={(next) => setFilters({ ...filters, assignee_id: next })}
+              options={[
+                { value: "", label: "All Owners" },
+                ...users.map((u) => ({ value: String(u.id), label: u.name })),
+              ]}
+            />
 
             <h2>Create Incident</h2>
             <input placeholder="Title" value={newIncident.title} onChange={(e) => setNewIncident({ ...newIncident, title: e.target.value })} />
@@ -240,27 +249,30 @@ export default function App() {
               value={newIncident.description}
               onChange={(e) => setNewIncident({ ...newIncident, description: e.target.value })}
             />
-            <select value={newIncident.severity} onChange={(e) => setNewIncident({ ...newIncident, severity: e.target.value })}>
-              {["SEV1", "SEV2", "SEV3", "SEV4"].map((s) => (
-                <option key={s}>{s}</option>
-              ))}
-            </select>
-            <select value={newIncident.service_id} onChange={(e) => setNewIncident({ ...newIncident, service_id: e.target.value })}>
-              <option value="">Select Service</option>
-              {services.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-            <select value={newIncident.assignee_id} onChange={(e) => setNewIncident({ ...newIncident, assignee_id: e.target.value })}>
-              <option value="">Unassigned</option>
-              {users.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name}
-                </option>
-              ))}
-            </select>
+            <CustomSelect
+              ariaLabel="New incident severity"
+              value={newIncident.severity}
+              onChange={(next) => setNewIncident({ ...newIncident, severity: next })}
+              options={["SEV1", "SEV2", "SEV3", "SEV4"].map((s) => ({ value: s, label: s }))}
+            />
+            <CustomSelect
+              ariaLabel="New incident service"
+              value={newIncident.service_id}
+              onChange={(next) => setNewIncident({ ...newIncident, service_id: next })}
+              options={[
+                { value: "", label: "Select Service" },
+                ...services.map((s) => ({ value: String(s.id), label: s.name })),
+              ]}
+            />
+            <CustomSelect
+              ariaLabel="New incident assignee"
+              value={newIncident.assignee_id}
+              onChange={(next) => setNewIncident({ ...newIncident, assignee_id: next })}
+              options={[
+                { value: "", label: "Unassigned" },
+                ...users.map((u) => ({ value: String(u.id), label: u.name })),
+              ]}
+            />
             <button
               onClick={async () => {
                 if (!newIncident.service_id) return;
