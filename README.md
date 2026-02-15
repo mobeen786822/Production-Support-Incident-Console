@@ -113,6 +113,22 @@ npm run dev
 
 Frontend URL: `http://127.0.0.1:5173`
 
+## Tests
+
+Backend:
+
+```bash
+cd backend
+pytest
+```
+
+Frontend:
+
+```bash
+cd frontend
+npm test
+```
+
 ## Demo Credentials
 
 - `jordan / demo123`
