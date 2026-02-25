@@ -143,6 +143,7 @@ docker compose -f docker-compose.demo.yml down -v
 ## Live Demo on Render
 
 This repo includes a Render Blueprint: [`render.yaml`](./render.yaml).
+Live demo (hosted on Render): `https://incident-console-ui.onrender.com/`
 
 1. Push this repo to GitHub.
 2. In Render, choose `New +` -> `Blueprint`, then select your repo.
