@@ -112,6 +112,70 @@ npm run dev
 ```
 
 Frontend URL: `http://127.0.0.1:5173`
+Frontend calls backend through Vite proxy at `/api`.
+
+## Live Demo (One Command with Docker)
+
+This starts a production-like demo stack with seeded data and one public app URL.
+
+```bash
+docker compose -f docker-compose.demo.yml up --build
+```
+
+Demo URL: `http://127.0.0.1:8080`
+
+What this runs:
+- `backend`: FastAPI on internal port `8000` with seeded SQLite at Docker volume `demo_db`
+- `frontend`: Nginx serving the React build and reverse-proxying `/api/*` to backend
+
+Stop demo:
+
+```bash
+docker compose -f docker-compose.demo.yml down
+```
+
+Reset demo data:
+
+```bash
+docker compose -f docker-compose.demo.yml down -v
+```
+
+## Live Demo on Render
+
+This repo includes a Render Blueprint: [`render.yaml`](./render.yaml).
+
+1. Push this repo to GitHub.
+2. In Render, choose `New +` -> `Blueprint`, then select your repo.
+3. Render will create:
+- `incident-console-api` (FastAPI web service)
+- `incident-console-ui` (static site)
+4. During setup, provide:
+- `VITE_API_BASE` on `incident-console-ui`: set to your backend public URL (example: `https://incident-console-api.onrender.com`)
+- `CORS_ORIGINS` on `incident-console-api`: set to your frontend URL (example: `https://incident-console-ui.onrender.com`)
+
+After deploy, open the frontend URL and use demo credentials below.
+
+## Live Demo on Railway
+
+Create two Railway services from this same repo:
+
+1. `incident-console-api`
+- Root directory: `backend`
+- Build command: `pip install -r requirements.txt`
+- Start command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+- Env vars:
+  - `JWT_SECRET` = any strong value
+  - `DATABASE_URL` = `sqlite:///./incident_console.db`
+  - `CORS_ORIGINS` = your frontend domain (comma-separated if multiple)
+
+2. `incident-console-ui`
+- Root directory: `frontend`
+- Build command: `npm ci && npm run build`
+- Start command: `npm run preview -- --host 0.0.0.0 --port $PORT`
+- Env vars:
+  - `VITE_API_BASE` = backend public URL from service 1
+
+Then open the frontend public domain and run the demo script.
 
 ## Tests
 

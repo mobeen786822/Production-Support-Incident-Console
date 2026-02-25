@@ -12,6 +12,10 @@ function textResponse(body: string, status: number): Response {
   return new Response(body, { status });
 }
 
+function normalizePath(pathname: string): string {
+  return pathname.startsWith("/api/") ? pathname.slice(4) : pathname;
+}
+
 describe("App integration", () => {
   beforeEach(() => {
     localStorage.clear();
@@ -22,17 +26,18 @@ describe("App integration", () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = new URL(typeof input === "string" ? input : input.toString());
       const method = init?.method ?? "GET";
+      const path = normalizePath(url.pathname);
 
-      if (url.pathname === "/auth/login" && method === "POST") {
+      if (path === "/auth/login" && method === "POST") {
         return jsonResponse({ access_token: "token-1" });
       }
-      if (url.pathname === "/users") {
+      if (path === "/users") {
         return jsonResponse([{ id: 1, name: "Jordan Patel", username: "jordan", role: "incident_commander" }]);
       }
-      if (url.pathname === "/services") {
+      if (path === "/services") {
         return jsonResponse([{ id: 10, name: "Payments API", owner_team: "Core Payments", sla_policy: {} }]);
       }
-      if (url.pathname === "/metrics") {
+      if (path === "/metrics") {
         return jsonResponse({
           total_incidents: 1,
           open_incidents: 1,
@@ -42,7 +47,7 @@ describe("App integration", () => {
           breach_rate: 0,
         });
       }
-      if (url.pathname === "/incidents" && method === "GET") {
+      if (path === "/incidents" && method === "GET") {
         return jsonResponse([
           {
             id: 42,
@@ -62,7 +67,7 @@ describe("App integration", () => {
           },
         ]);
       }
-      if (url.pathname === "/incidents/42" && method === "GET") {
+      if (path === "/incidents/42" && method === "GET") {
         return jsonResponse({
           id: 42,
           title: "Checkout timeout",
@@ -104,14 +109,15 @@ describe("App integration", () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = new URL(typeof input === "string" ? input : input.toString());
       const method = init?.method ?? "GET";
+      const path = normalizePath(url.pathname);
 
-      if (url.pathname === "/users") {
+      if (path === "/users") {
         return jsonResponse([{ id: 1, name: "Jordan Patel", username: "jordan", role: "incident_commander" }]);
       }
-      if (url.pathname === "/services") {
+      if (path === "/services") {
         return jsonResponse([{ id: 10, name: "Payments API", owner_team: "Core Payments", sla_policy: {} }]);
       }
-      if (url.pathname === "/metrics") {
+      if (path === "/metrics") {
         return jsonResponse({
           total_incidents: 1,
           open_incidents: 0,
@@ -121,7 +127,7 @@ describe("App integration", () => {
           breach_rate: 0,
         });
       }
-      if (url.pathname === "/incidents" && method === "GET") {
+      if (path === "/incidents" && method === "GET") {
         return jsonResponse([
           {
             id: 1,
@@ -141,7 +147,7 @@ describe("App integration", () => {
           },
         ]);
       }
-      if (url.pathname === "/incidents/1" && method === "GET") {
+      if (path === "/incidents/1" && method === "GET") {
         return jsonResponse({
           id: 1,
           title: "Resolved incident pending closure",
@@ -170,7 +176,7 @@ describe("App integration", () => {
           },
         });
       }
-      if (url.pathname === "/incidents/1/status" && method === "POST") {
+      if (path === "/incidents/1/status" && method === "POST") {
         status = "Closed";
         closedAt = new Date().toISOString();
         return jsonResponse({
