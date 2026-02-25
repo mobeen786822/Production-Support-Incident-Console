@@ -1,7 +1,8 @@
 import json
 from functools import lru_cache
+from typing import Annotated
 from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, NoDecode
 
 
 class Settings(BaseSettings):
@@ -10,7 +11,7 @@ class Settings(BaseSettings):
     jwt_secret: str = Field(default="dev-secret-change-me", alias="JWT_SECRET")
     jwt_algorithm: str = "HS256"
     token_expiry_minutes: int = 8 * 60
-    cors_origins: list[str] = Field(
+    cors_origins: Annotated[list[str], NoDecode] = Field(
         default=["http://localhost:5173", "http://127.0.0.1:5173"],
         alias="CORS_ORIGINS",
     )
