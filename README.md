@@ -1,11 +1,20 @@
 # Production Support Incident Console
 
-Simulated enterprise incident-management web app focused on production support workflows:
+A production-grade incident management console implementing real SRE workflows:
 - Incident intake and triage
 - SLA tracking and breach visibility
 - Runbook-driven mitigation logging
 - RCA-gated closure
 - Post-incident reporting and operational metrics
+
+Live demo (hosted on Render): [https://incident-console-ui.onrender.com/](https://incident-console-ui.onrender.com/)
+
+![Production Support Incident Console Dashboard](docs/images/dashboard.png)
+
+## Why I Built This
+
+Built to demonstrate production-grade incident management workflows that mirror real SRE/DevOps environments.  
+The goal was to model how incidents are actually handled end-to-end, including SLA enforcement, runbook-driven mitigation, RCA-gated closure, and operational metrics like MTTA and MTTR.
 
 ## Stack
 
@@ -143,7 +152,7 @@ docker compose -f docker-compose.demo.yml down -v
 ## Live Demo on Render
 
 This repo includes a Render Blueprint: [`render.yaml`](./render.yaml).
-Live demo (hosted on Render): `https://incident-console-ui.onrender.com/`
+Live demo (hosted on Render): [https://incident-console-ui.onrender.com/](https://incident-console-ui.onrender.com/)
 
 1. Push this repo to GitHub.
 2. In Render, choose `New +` -> `Blueprint`, then select your repo.
@@ -196,9 +205,9 @@ npm test
 
 ## Demo Credentials
 
-- `jordan / demo123`
-- `avery / demo123`
-- `morgan / demo123`
+- `jordan / demo123` - `incident_commander`
+- `avery / demo123` - `engineer`
+- `morgan / demo123` - `manager`
 
 Seed data includes users, services, runbooks, and one active incident.
 
