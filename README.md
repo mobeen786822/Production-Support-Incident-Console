@@ -150,17 +150,10 @@ This repo includes a Render Blueprint: [`render.yaml`](./render.yaml).
 - `incident-console-api` (FastAPI web service)
 - `incident-console-ui` (static site)
 4. During setup, provide:
-- `CORS_ORIGINS` on `incident-console-api`: `https://<your-ui-service>.onrender.com`
-- `VITE_API_BASE` on `incident-console-ui`: `https://<your-api-service>.onrender.com`
+- `VITE_API_BASE` on `incident-console-ui`: set to your backend public URL (example: `https://incident-console-api.onrender.com`)
+- `CORS_ORIGINS` on `incident-console-api`: set to your frontend URL (example: `https://incident-console-ui.onrender.com`)
 
-After deploy:
-- Open `https://<your-api-service>.onrender.com/health` and verify `{"status":"ok"}`.
-- Redeploy UI after setting `VITE_API_BASE`.
-- If URLs changed from placeholders, update both env vars to exact live URLs and redeploy both services.
-
-Important notes:
-- Blueprint pins API runtime to `PYTHON_VERSION=3.12.10` to avoid `pydantic-core` build failures on newer Python.
-- `CORS_ORIGINS` should be plain text URL(s), comma-separated when using multiple origins.
+After deploy, open the frontend URL and use demo credentials below.
 
 ## Live Demo on Railway
 
