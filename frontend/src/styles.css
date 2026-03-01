@@ -290,8 +290,12 @@ textarea {
 }
 
 .sev {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-weight: 700;
-  padding: 0.08rem 0.46rem;
+  line-height: 1.2;
+  padding: 0.18rem 0.52rem;
   border-radius: 999px;
   border: 1px solid transparent;
 }
@@ -303,9 +307,9 @@ textarea {
 }
 
 .sev.sev2 {
-  color: #fde68a;
-  background: rgba(120, 53, 15, 0.35);
-  border-color: rgba(245, 158, 11, 0.35);
+  color: #fcd34d;
+  background: rgba(245, 158, 11, 0.16);
+  border-color: rgba(245, 158, 11, 0.5);
 }
 
 .sev.sev3 {
