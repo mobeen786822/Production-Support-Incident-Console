@@ -37,7 +37,7 @@ export default function CustomSelect({ value, onChange, options, ariaLabel }: Cu
         onClick={() => setOpen((prev) => !prev)}
       >
         <span>{selected?.label ?? ""}</span>
-        <span className="select-chevron">▾</span>
+        <span className="select-chevron">v</span>
       </button>
       {open && (
         <div className="select-menu" role="listbox" aria-label={`${ariaLabel} options`}>
@@ -59,3 +59,4 @@ export default function CustomSelect({ value, onChange, options, ariaLabel }: Cu
     </div>
   );
 }
+
