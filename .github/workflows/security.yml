@@ -1,0 +1,223 @@
+name: Security
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  security-scans:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install scan tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install bandit pip-audit
+          curl -sSfL https://raw.githubusercontent.com/gitleaks/gitleaks/master/install.sh | sh -s -- -b /usr/local/bin
+
+      - name: Run Gitleaks (whole repo)
+        id: gitleaks
+        continue-on-error: true
+        run: |
+          gitleaks detect \
+            --source . \
+            --report-format json \
+            --report-path gitleaks-report.json \
+            --no-banner
+
+      - name: Run Bandit (backend, HIGH only)
+        id: bandit
+        continue-on-error: true
+        run: |
+          bandit -r backend -f json -o bandit-report.json --severity-level high
+
+      - name: Run pip-audit (backend requirements)
+        id: pip_audit
+        continue-on-error: true
+        run: |
+          pip-audit -r backend/requirements.txt -f json -o pip-audit-report.json
+
+      - name: Run npm audit (frontend, HIGH+)
+        id: npm_audit
+        continue-on-error: true
+        working-directory: frontend
+        run: |
+          npm audit --audit-level=high --json --package-lock-only > ../npm-audit-report.json
+
+      - name: Build security summary
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          def load_json(path):
+              p = Path(path)
+              if not p.exists():
+                  return None
+              try:
+                  return json.loads(p.read_text(encoding="utf-8"))
+              except Exception:
+                  return None
+
+          gitleaks_data = load_json("gitleaks-report.json")
+          bandit_data = load_json("bandit-report.json")
+          pip_audit_data = load_json("pip-audit-report.json")
+          npm_audit_data = load_json("npm-audit-report.json")
+
+          gitleaks_findings = (
+              len(gitleaks_data) if isinstance(gitleaks_data, list) else 0
+          )
+          bandit_high = (
+              len(bandit_data.get("results", [])) if isinstance(bandit_data, dict) else 0
+          )
+
+          pip_vulns = 0
+          if isinstance(pip_audit_data, dict):
+              deps = pip_audit_data.get("dependencies", [])
+              for dep in deps:
+                  pip_vulns += len(dep.get("vulns", []))
+          elif isinstance(pip_audit_data, list):
+              for dep in pip_audit_data:
+                  pip_vulns += len(dep.get("vulns", []))
+
+          npm_high = 0
+          npm_critical = 0
+          if isinstance(npm_audit_data, dict):
+              meta = npm_audit_data.get("metadata", {})
+              vulns = meta.get("vulnerabilities", {})
+              npm_high = int(vulns.get("high", 0))
+              npm_critical = int(vulns.get("critical", 0))
+
+          gitleaks_outcome = "${{ steps.gitleaks.outcome }}"
+          bandit_outcome = "${{ steps.bandit.outcome }}"
+          pip_outcome = "${{ steps.pip_audit.outcome }}"
+          npm_outcome = "${{ steps.npm_audit.outcome }}"
+
+          lines = []
+          lines.append("## Security Scan Summary")
+          lines.append("")
+          lines.append("| Scan | Outcome | Result |")
+          lines.append("|---|---|---|")
+          lines.append(f"| Gitleaks | {gitleaks_outcome} | findings: {gitleaks_findings} |")
+          lines.append(f"| Bandit (HIGH) | {bandit_outcome} | high findings: {bandit_high} |")
+          lines.append(f"| pip-audit | {pip_outcome} | CVEs: {pip_vulns} |")
+          lines.append(
+              f"| npm audit (HIGH+) | {npm_outcome} | high: {npm_high}, critical: {npm_critical} |"
+          )
+
+          summary_file = os.environ["GITHUB_STEP_SUMMARY"]
+          with open(summary_file, "a", encoding="utf-8") as f:
+              f.write("\n".join(lines) + "\n")
+          PY
+
+      - name: Enforce fail conditions
+        if: always()
+        env:
+          GITLEAKS_OUTCOME: ${{ steps.gitleaks.outcome }}
+          BANDIT_OUTCOME: ${{ steps.bandit.outcome }}
+          PIP_AUDIT_OUTCOME: ${{ steps.pip_audit.outcome }}
+          NPM_AUDIT_OUTCOME: ${{ steps.npm_audit.outcome }}
+          GITHUB_STEP_SUMMARY: ${{ env.GITHUB_STEP_SUMMARY }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import sys
+          from pathlib import Path
+
+          def load_json(path):
+              p = Path(path)
+              if not p.exists():
+                  return None
+              try:
+                  return json.loads(p.read_text(encoding="utf-8"))
+              except Exception:
+                  return None
+
+          failures = []
+
+          gitleaks_outcome = os.environ.get("GITLEAKS_OUTCOME", "")
+          bandit_outcome = os.environ.get("BANDIT_OUTCOME", "")
+          pip_outcome = os.environ.get("PIP_AUDIT_OUTCOME", "")
+          npm_outcome = os.environ.get("NPM_AUDIT_OUTCOME", "")
+          if gitleaks_outcome not in {"success", "failure"}:
+              failures.append("Gitleaks scan did not execute correctly")
+          if bandit_outcome not in {"success", "failure"}:
+              failures.append("Bandit scan did not execute correctly")
+          if pip_outcome not in {"success", "failure"}:
+              failures.append("pip-audit scan did not execute correctly")
+          if npm_outcome not in {"success", "failure"}:
+              failures.append("npm audit scan did not execute correctly")
+
+          # Gitleaks: fail on any findings
+          gitleaks_data = load_json("gitleaks-report.json")
+          gitleaks_findings = len(gitleaks_data) if isinstance(gitleaks_data, list) else 0
+          if gitleaks_findings > 0:
+              failures.append(
+                  f"Gitleaks detected {gitleaks_findings} potential secret(s). Remove/revoke secrets and re-run."
+              )
+
+          # Bandit: fail on HIGH findings only
+          bandit_data = load_json("bandit-report.json")
+          bandit_high = len(bandit_data.get("results", [])) if isinstance(bandit_data, dict) else 0
+          if bandit_high > 0:
+              failures.append(f"Bandit HIGH findings: {bandit_high}")
+
+          # pip-audit: fail on any vulnerabilities
+          pip_data = load_json("pip-audit-report.json")
+          pip_vulns = 0
+          if isinstance(pip_data, dict):
+              for dep in pip_data.get("dependencies", []):
+                  pip_vulns += len(dep.get("vulns", []))
+          elif isinstance(pip_data, list):
+              for dep in pip_data:
+                  pip_vulns += len(dep.get("vulns", []))
+          if pip_vulns > 0:
+              failures.append(f"pip-audit CVEs: {pip_vulns}")
+
+          # npm audit: fail on high/critical vulnerabilities
+          npm_data = load_json("npm-audit-report.json")
+          npm_high = 0
+          npm_critical = 0
+          if isinstance(npm_data, dict):
+              vulns = npm_data.get("metadata", {}).get("vulnerabilities", {})
+              npm_high = int(vulns.get("high", 0))
+              npm_critical = int(vulns.get("critical", 0))
+          if (npm_high + npm_critical) > 0:
+              failures.append(f"npm audit high/critical: high={npm_high}, critical={npm_critical}")
+
+          if failures:
+              summary_file = os.environ.get("GITHUB_STEP_SUMMARY")
+              if summary_file:
+                  with open(summary_file, "a", encoding="utf-8") as f:
+                      f.write("\n## Security Gate Failure\n\n")
+                      for failure in failures:
+                          f.write(f"- {failure}\n")
+              print("Security policy failed:")
+              for failure in failures:
+                  print(f"- {failure}")
+              sys.exit(1)
+
+          print("Security policy passed.")
+          PY
