@@ -32,20 +32,66 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install bandit pip-audit
-          curl -sSfL https://raw.githubusercontent.com/gitleaks/gitleaks/master/install.sh | sh -s -- -b /usr/local/bin
 
       - name: Run Gitleaks (whole repo)
         id: gitleaks
         continue-on-error: true
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: "false"
+          GITLEAKS_ENABLE_SUMMARY: "false"
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
+
+      - name: Normalize Gitleaks report file
+        if: always()
+        env:
+          GITLEAKS_OUTCOME: ${{ steps.gitleaks.outcome }}
         run: |
-          gitleaks detect \
-            --source . \
-            --report-format json \
-            --report-path gitleaks-report.json \
-            --no-banner
-          if [ ! -s gitleaks-report.json ]; then
-            echo "[]" > gitleaks-report.json
-          fi
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          report_path = Path("gitleaks-report.json")
+          if report_path.exists() and report_path.stat().st_size > 0:
+              raise SystemExit(0)
+
+          sarif_candidates = [
+              Path("results.sarif"),
+              Path("gitleaks.sarif"),
+              Path("gitleaks-report.sarif"),
+              Path("/tmp/results.sarif"),
+              Path("/tmp/gitleaks.sarif"),
+          ]
+
+          findings = None
+          for sarif_path in sarif_candidates:
+              if not sarif_path.exists() or sarif_path.stat().st_size == 0:
+                  continue
+              try:
+                  sarif = json.loads(sarif_path.read_text(encoding="utf-8"))
+              except Exception:
+                  continue
+              runs = sarif.get("runs", []) if isinstance(sarif, dict) else []
+              mapped = []
+              for run in runs:
+                  results = run.get("results", []) if isinstance(run, dict) else []
+                  for result in results:
+                      if isinstance(result, dict):
+                          mapped.append(result)
+              findings = mapped
+              break
+
+          if findings is None:
+              # Fallback when action doesn't leave a local report file.
+              if os.environ.get("GITLEAKS_OUTCOME") == "failure":
+                  findings = [{"message": "gitleaks-action detected potential secret(s)"}]
+              else:
+                  findings = []
+
+          report_path.write_text(json.dumps(findings), encoding="utf-8")
+          PY
 
       - name: Run Bandit (backend, HIGH only)
         id: bandit
