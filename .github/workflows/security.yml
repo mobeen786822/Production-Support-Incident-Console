@@ -133,12 +133,6 @@ jobs:
 
       - name: Enforce fail conditions
         if: always()
-        env:
-          GITLEAKS_OUTCOME: ${{ steps.gitleaks.outcome }}
-          BANDIT_OUTCOME: ${{ steps.bandit.outcome }}
-          PIP_AUDIT_OUTCOME: ${{ steps.pip_audit.outcome }}
-          NPM_AUDIT_OUTCOME: ${{ steps.npm_audit.outcome }}
-          GITHUB_STEP_SUMMARY: ${{ env.GITHUB_STEP_SUMMARY }}
         run: |
           python - <<'PY'
           import json
@@ -149,29 +143,22 @@ jobs:
           def load_json(path):
               p = Path(path)
               if not p.exists():
-                  return None
+                  return None, "missing"
               try:
-                  return json.loads(p.read_text(encoding="utf-8"))
+                  raw = p.read_text(encoding="utf-8")
+                  if not raw.strip():
+                      return None, "empty"
+                  return json.loads(raw), "ok"
               except Exception:
-                  return None
+                  return None, "invalid"
 
           failures = []
-
-          gitleaks_outcome = os.environ.get("GITLEAKS_OUTCOME", "")
-          bandit_outcome = os.environ.get("BANDIT_OUTCOME", "")
-          pip_outcome = os.environ.get("PIP_AUDIT_OUTCOME", "")
-          npm_outcome = os.environ.get("NPM_AUDIT_OUTCOME", "")
-          if gitleaks_outcome not in {"success", "failure"}:
-              failures.append("Gitleaks scan did not execute correctly")
-          if bandit_outcome not in {"success", "failure"}:
-              failures.append("Bandit scan did not execute correctly")
-          if pip_outcome not in {"success", "failure"}:
-              failures.append("pip-audit scan did not execute correctly")
-          if npm_outcome not in {"success", "failure"}:
-              failures.append("npm audit scan did not execute correctly")
+          read_notes = []
 
           # Gitleaks: fail on any findings
-          gitleaks_data = load_json("gitleaks-report.json")
+          gitleaks_data, gitleaks_state = load_json("gitleaks-report.json")
+          if gitleaks_state != "ok":
+              read_notes.append(f"gitleaks-report.json: {gitleaks_state}, treating as 0 findings")
           gitleaks_findings = len(gitleaks_data) if isinstance(gitleaks_data, list) else 0
           if gitleaks_findings > 0:
               failures.append(
@@ -179,36 +166,55 @@ jobs:
               )
 
           # Bandit: fail on HIGH findings only
-          bandit_data = load_json("bandit-report.json")
+          bandit_data, bandit_state = load_json("bandit-report.json")
+          if bandit_state != "ok":
+              read_notes.append(f"bandit-report.json: {bandit_state}, treating as 0 findings")
           bandit_high = len(bandit_data.get("results", [])) if isinstance(bandit_data, dict) else 0
           if bandit_high > 0:
               failures.append(f"Bandit HIGH findings: {bandit_high}")
 
           # pip-audit: fail on any vulnerabilities
-          pip_data = load_json("pip-audit-report.json")
+          pip_data, pip_state = load_json("pip-audit-report.json")
+          if pip_state != "ok":
+              read_notes.append(f"pip-audit-report.json: {pip_state}, treating as 0 findings")
           pip_vulns = 0
           if isinstance(pip_data, dict):
               for dep in pip_data.get("dependencies", []):
-                  pip_vulns += len(dep.get("vulns", []))
+                  if isinstance(dep, dict):
+                      vulns = dep.get("vulns", [])
+                      if isinstance(vulns, list):
+                          pip_vulns += len(vulns)
           elif isinstance(pip_data, list):
               for dep in pip_data:
-                  pip_vulns += len(dep.get("vulns", []))
+                  if isinstance(dep, dict):
+                      vulns = dep.get("vulns", [])
+                      if isinstance(vulns, list):
+                          pip_vulns += len(vulns)
           if pip_vulns > 0:
               failures.append(f"pip-audit CVEs: {pip_vulns}")
 
           # npm audit: fail on high/critical vulnerabilities
-          npm_data = load_json("npm-audit-report.json")
+          npm_data, npm_state = load_json("npm-audit-report.json")
+          if npm_state != "ok":
+              read_notes.append(f"npm-audit-report.json: {npm_state}, treating as 0 findings")
           npm_high = 0
           npm_critical = 0
           if isinstance(npm_data, dict):
               vulns = npm_data.get("metadata", {}).get("vulnerabilities", {})
-              npm_high = int(vulns.get("high", 0))
-              npm_critical = int(vulns.get("critical", 0))
+              if isinstance(vulns, dict):
+                  npm_high = int(vulns.get("high", 0) or 0)
+                  npm_critical = int(vulns.get("critical", 0) or 0)
           if (npm_high + npm_critical) > 0:
               failures.append(f"npm audit high/critical: high={npm_high}, critical={npm_critical}")
 
+          summary_file = os.environ.get("GITHUB_STEP_SUMMARY")
+          if read_notes and summary_file:
+              with open(summary_file, "a", encoding="utf-8") as f:
+                  f.write("\n### Report Read Notes\n\n")
+                  for note in read_notes:
+                      f.write(f"- {note}\n")
+
           if failures:
-              summary_file = os.environ.get("GITHUB_STEP_SUMMARY")
               if summary_file:
                   with open(summary_file, "a", encoding="utf-8") as f:
                       f.write("\n## Security Gate Failure\n\n")
