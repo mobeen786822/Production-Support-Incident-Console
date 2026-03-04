@@ -204,6 +204,23 @@ cd frontend
 npm test
 ```
 
+## Security
+
+Recent audit remediation completed:
+
+- Backend (`pip-audit`):
+  - `python-jose==3.3.0` had `PYSEC-2024-232` and `PYSEC-2024-233`. Replaced with `PyJWT==2.11.0`.
+  - This was an explicit security architecture decision: `python-jose` pulled in `ecdsa` with an unfixed vulnerability path, so the safer approach was library replacement instead of accepting residual risk.
+  - `python-multipart==0.0.20` had `CVE-2026-24486`. Upgraded to `0.0.22`.
+  - Transitive `starlette` CVEs (`CVE-2025-54121`, `CVE-2025-62727`) were resolved by upgrading `fastapi` to `0.135.1` (which pulls a patched Starlette release).
+- Frontend (`npm audit`):
+  - Ran `npm audit fix`, then `npm audit fix --force` (major update to `vitest`) to fully clear remaining advisories.
+- Verification:
+  - `python -m pip_audit --requirement backend/requirements.txt` -> `No known vulnerabilities found`.
+  - `npm audit` -> `found 0 vulnerabilities`.
+- CI workflow:
+  - Updated `.github/workflows/security.yml` so Gitleaks always writes `gitleaks-report.json`, ensuring the enforce step can reliably read it.
+
 ## Demo Credentials
 
 - `jordan / demo123` - `incident_commander`

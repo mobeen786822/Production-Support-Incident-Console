@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 
-from jose import JWTError, jwt
+import jwt
+from jwt import InvalidTokenError
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
@@ -27,7 +28,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     try:
         payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
         user_id = int(payload.get("sub"))
-    except (JWTError, ValueError, TypeError):
+    except (InvalidTokenError, ValueError, TypeError):
         raise credentials_error
 
     user = db.query(User).filter(User.id == user_id).first()

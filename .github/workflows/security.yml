@@ -43,6 +43,9 @@ jobs:
             --report-format json \
             --report-path gitleaks-report.json \
             --no-banner
+          if [ ! -s gitleaks-report.json ]; then
+            echo "[]" > gitleaks-report.json
+          fi
 
       - name: Run Bandit (backend, HIGH only)
         id: bandit
