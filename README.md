@@ -215,6 +215,7 @@ Recent audit remediation completed:
   - Transitive `starlette` CVEs (`CVE-2025-54121`, `CVE-2025-62727`) were resolved by upgrading `fastapi` to `0.135.1` (which pulls a patched Starlette release).
 - Frontend (`npm audit`):
   - Ran `npm audit fix`, then `npm audit fix --force` (major update to `vitest`) to fully clear remaining advisories.
+  - Upgraded Vite toolchain to v7 to resolve a HIGH severity vulnerability surfaced by npm audit.
 - Verification:
   - `python -m pip_audit --requirement backend/requirements.txt` -> `No known vulnerabilities found`.
   - `npm audit` -> `found 0 vulnerabilities`.
