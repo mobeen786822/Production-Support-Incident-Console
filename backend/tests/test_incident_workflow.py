@@ -4,7 +4,8 @@ from fastapi.testclient import TestClient
 
 from app.db import Base, SessionLocal, engine
 from app.main import app
-from app.models import Incident
+from app.models import Incident, User
+from app.passwords import is_password_hash
 from app.seed import seed
 
 
@@ -84,6 +85,18 @@ def test_lifecycle_and_rca_closure_gate() -> None:
         assert close_with_rca.status_code == 200
         assert close_with_rca.json()["status"] == "Closed"
         assert close_with_rca.json()["closed_at"] is not None
+
+
+def test_seeded_passwords_are_hashed_and_invalid_login_fails() -> None:
+    reset_database()
+    with SessionLocal() as db:
+        user = db.query(User).filter(User.username == "jordan").one()
+        assert user.password != "demo123"
+        assert is_password_hash(user.password)
+
+    with TestClient(app) as client:
+        response = client.post("/auth/login", json={"username": "jordan", "password": "wrong"})
+        assert response.status_code == 401
 
 
 def test_sla_breach_and_non_breach_cases() -> None:

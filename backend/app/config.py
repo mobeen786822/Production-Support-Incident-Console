@@ -8,7 +8,7 @@ from pydantic_settings import BaseSettings, NoDecode
 class Settings(BaseSettings):
     app_name: str = "Production Support Incident Console"
     database_url: str = Field(default="sqlite:///./incident_console.db", alias="DATABASE_URL")
-    jwt_secret: str = Field(default="dev-secret-change-me", alias="JWT_SECRET")
+    jwt_secret: str = Field(alias="JWT_SECRET", min_length=32)
     jwt_algorithm: str = "HS256"
     token_expiry_minutes: int = 8 * 60
     cors_origins: Annotated[list[str], NoDecode] = Field(

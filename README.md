@@ -208,9 +208,14 @@ npm test
 
 Recent audit remediation completed:
 
+- Authentication:
+  - Seeded passwords are stored with PBKDF2-SHA256 hashes, never plaintext.
+  - Existing plaintext demo rows are migrated to hashes at startup.
+  - `JWT_SECRET` is required, must be at least 32 characters, and has no predictable fallback.
+
 - Backend (`pip-audit`):
   - `python-jose==3.3.0` had `PYSEC-2024-232` and `PYSEC-2024-233`. Replaced with `PyJWT==2.11.0`.
-  - This was an explicit security architecture decision: `python-jose` pulled in `ecdsa` with an unfixed vulnerability path, so the safer approach was library replacement instead of accepting residual risk.
+  - The unused `python-jose`, `ecdsa`, `pyasn1`, and `cryptography` direct dependencies were removed.
   - `python-multipart==0.0.20` had `CVE-2026-24486`. Upgraded to `0.0.22`.
   - Transitive `starlette` CVEs (`CVE-2025-54121`, `CVE-2025-62727`) were resolved by upgrading `fastapi` to `0.135.1` (which pulls a patched Starlette release).
 - Frontend (`npm audit`):

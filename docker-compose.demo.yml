@@ -4,7 +4,7 @@ services:
       context: ./backend
     environment:
       DATABASE_URL: sqlite:////app/data/incident_console.db
-      JWT_SECRET: dev-secret-change-me
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET to a strong random value}
     volumes:
       - demo_db:/app/data
     expose:

@@ -3,6 +3,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from .models import Incident, IncidentEvent, RCA, Runbook, Service, User
+from .passwords import hash_password
 
 
 def seed(db: Session) -> None:
@@ -10,9 +11,9 @@ def seed(db: Session) -> None:
         return
 
     users = [
-        User(name="Avery Chen", username="avery", password="demo123", role="engineer"),
-        User(name="Jordan Patel", username="jordan", password="demo123", role="incident_commander"),
-        User(name="Morgan Diaz", username="morgan", password="demo123", role="manager"),
+        User(name="Avery Chen", username="avery", password=hash_password("demo123"), role="engineer"),
+        User(name="Jordan Patel", username="jordan", password=hash_password("demo123"), role="incident_commander"),
+        User(name="Morgan Diaz", username="morgan", password=hash_password("demo123"), role="manager"),
     ]
     db.add_all(users)
     db.flush()

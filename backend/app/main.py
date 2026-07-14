@@ -11,6 +11,7 @@ from .auth import create_access_token, get_current_user
 from .config import get_settings
 from .db import Base, SessionLocal, engine, get_db
 from .models import Incident, IncidentEvent, RCA, Runbook, Service, User
+from .passwords import hash_password, is_password_hash, verify_password
 from .schemas import (
     AlertGenerateIn,
     IncidentComment,
@@ -56,6 +57,11 @@ def startup() -> None:
     Base.metadata.create_all(bind=engine)
     with SessionLocal() as db:
         seed(db)
+        plaintext_users = [user for user in db.query(User).all() if not is_password_hash(user.password)]
+        for user in plaintext_users:
+            user.password = hash_password(user.password)
+        if plaintext_users:
+            db.commit()
 
 
 @app.get("/health")
@@ -66,7 +72,7 @@ def health() -> dict:
 @app.post("/auth/login", response_model=TokenResponse)
 def login(payload: TokenRequest, db: Session = Depends(get_db)) -> TokenResponse:
     user = db.query(User).filter(User.username == payload.username).first()
-    if not user or user.password != payload.password:
+    if not user or not verify_password(payload.password, user.password):
         raise HTTPException(status_code=401, detail="Invalid username or password")
     return TokenResponse(access_token=create_access_token(user.id))
 
