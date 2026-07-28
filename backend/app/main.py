@@ -2,7 +2,7 @@ from datetime import datetime
 from statistics import mean
 from random import choice
 
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
 from sqlalchemy.orm import Session
@@ -12,6 +12,7 @@ from .config import get_settings
 from .db import Base, SessionLocal, engine, get_db
 from .models import Incident, IncidentEvent, RCA, Runbook, Service, User
 from .passwords import hash_password, is_password_hash, verify_password
+from .rate_limit import LoginRateLimiter
 from .schemas import (
     AlertGenerateIn,
     IncidentComment,
@@ -34,6 +35,10 @@ from .sla import breach_state, deadline, severity_hours
 
 settings = get_settings()
 app = FastAPI(title=settings.app_name)
+login_rate_limiter = LoginRateLimiter(
+    attempts=settings.login_rate_limit_attempts,
+    window_seconds=settings.login_rate_limit_window_seconds,
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -70,9 +75,12 @@ def health() -> dict:
 
 
 @app.post("/auth/login", response_model=TokenResponse)
-def login(payload: TokenRequest, db: Session = Depends(get_db)) -> TokenResponse:
+def login(request: Request, payload: TokenRequest, db: Session = Depends(get_db)) -> TokenResponse:
+    client_host = request.client.host if request.client else "unknown"
+    login_rate_limiter.check(client_host)
     user = db.query(User).filter(User.username == payload.username).first()
     if not user or not verify_password(payload.password, user.password):
+        login_rate_limiter.record_failure(client_host)
         raise HTTPException(status_code=401, detail="Invalid username or password")
     return TokenResponse(access_token=create_access_token(user.id))
 

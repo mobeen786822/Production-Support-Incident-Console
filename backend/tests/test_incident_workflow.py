@@ -3,13 +3,14 @@ from datetime import datetime, timedelta
 from fastapi.testclient import TestClient
 
 from app.db import Base, SessionLocal, engine
-from app.main import app
+from app.main import app, login_rate_limiter
 from app.models import Incident, User
 from app.passwords import is_password_hash
 from app.seed import seed
 
 
 def reset_database() -> None:
+    login_rate_limiter.clear()
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     with SessionLocal() as db:
@@ -97,6 +98,18 @@ def test_seeded_passwords_are_hashed_and_invalid_login_fails() -> None:
     with TestClient(app) as client:
         response = client.post("/auth/login", json={"username": "jordan", "password": "wrong"})
         assert response.status_code == 401
+
+
+def test_login_rate_limit_blocks_repeated_failures() -> None:
+    reset_database()
+    with TestClient(app) as client:
+        for _ in range(5):
+            response = client.post("/auth/login", json={"username": "jordan", "password": "wrong"})
+            assert response.status_code == 401
+
+        blocked = client.post("/auth/login", json={"username": "jordan", "password": "wrong"})
+        assert blocked.status_code == 429
+        assert int(blocked.headers["Retry-After"]) > 0
 
 
 def test_sla_breach_and_non_breach_cases() -> None:

@@ -11,6 +11,8 @@ class Settings(BaseSettings):
     jwt_secret: str = Field(alias="JWT_SECRET", min_length=32)
     jwt_algorithm: str = "HS256"
     token_expiry_minutes: int = 8 * 60
+    login_rate_limit_attempts: int = Field(default=5, alias="LOGIN_RATE_LIMIT_ATTEMPTS", gt=0)
+    login_rate_limit_window_seconds: int = Field(default=60, alias="LOGIN_RATE_LIMIT_WINDOW_SECONDS", gt=0)
     cors_origins: Annotated[list[str], NoDecode] = Field(
         default=["http://localhost:5173", "http://127.0.0.1:5173"],
         alias="CORS_ORIGINS",
