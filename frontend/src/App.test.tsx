@@ -23,33 +23,69 @@ describe("App integration", () => {
   });
 
   it("logs in and renders dashboard incident data", async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = new URL(typeof input === "string" ? input : input.toString());
-      const method = init?.method ?? "GET";
-      const path = normalizePath(url.pathname);
+    const fetchMock = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = new URL(
+          typeof input === "string" ? input : input.toString(),
+        );
+        const method = init?.method ?? "GET";
+        const path = normalizePath(url.pathname);
 
-      if (path === "/auth/login" && method === "POST") {
-        return jsonResponse({ access_token: "token-1" });
-      }
-      if (path === "/users") {
-        return jsonResponse([{ id: 1, name: "Jordan Patel", username: "jordan", role: "incident_commander" }]);
-      }
-      if (path === "/services") {
-        return jsonResponse([{ id: 10, name: "Payments API", owner_team: "Core Payments", sla_policy: {} }]);
-      }
-      if (path === "/metrics") {
-        return jsonResponse({
-          total_incidents: 1,
-          open_incidents: 1,
-          closed_incidents: 0,
-          mtta_minutes: 2,
-          mttr_minutes: 15,
-          breach_rate: 0,
-        });
-      }
-      if (path === "/incidents" && method === "GET") {
-        return jsonResponse([
-          {
+        if (path === "/auth/login" && method === "POST") {
+          return jsonResponse({ access_token: "token-1" });
+        }
+        if (path === "/users") {
+          return jsonResponse([
+            {
+              id: 1,
+              name: "Jordan Patel",
+              username: "jordan",
+              role: "incident_commander",
+            },
+          ]);
+        }
+        if (path === "/services") {
+          return jsonResponse([
+            {
+              id: 10,
+              name: "Payments API",
+              owner_team: "Core Payments",
+              sla_policy: {},
+            },
+          ]);
+        }
+        if (path === "/metrics") {
+          return jsonResponse({
+            total_incidents: 1,
+            open_incidents: 1,
+            closed_incidents: 0,
+            mtta_minutes: 2,
+            mttr_minutes: 15,
+            breach_rate: 0,
+          });
+        }
+        if (path === "/incidents" && method === "GET") {
+          return jsonResponse([
+            {
+              id: 42,
+              title: "Checkout timeout",
+              description: "Timeout spike",
+              severity: "SEV2",
+              status: "Investigating",
+              service_id: 10,
+              assignee_id: 1,
+              created_at: new Date().toISOString(),
+              acknowledged_at: new Date().toISOString(),
+              resolved_at: null,
+              closed_at: null,
+              sla_deadline: new Date(Date.now() + 3600_000).toISOString(),
+              sla_hours: 2,
+              sla_breached: false,
+            },
+          ]);
+        }
+        if (path === "/incidents/42" && method === "GET") {
+          return jsonResponse({
             id: 42,
             title: "Checkout timeout",
             description: "Timeout spike",
@@ -64,41 +100,39 @@ describe("App integration", () => {
             sla_deadline: new Date(Date.now() + 3600_000).toISOString(),
             sla_hours: 2,
             sla_breached: false,
-          },
-        ]);
-      }
-      if (path === "/incidents/42" && method === "GET") {
-        return jsonResponse({
-          id: 42,
-          title: "Checkout timeout",
-          description: "Timeout spike",
-          severity: "SEV2",
-          status: "Investigating",
-          service_id: 10,
-          assignee_id: 1,
-          created_at: new Date().toISOString(),
-          acknowledged_at: new Date().toISOString(),
-          resolved_at: null,
-          closed_at: null,
-          sla_deadline: new Date(Date.now() + 3600_000).toISOString(),
-          sla_hours: 2,
-          sla_breached: false,
-          service_name: "Payments API",
-          events: [],
-          runbooks: [],
-          rca: null,
-        });
-      }
-      throw new Error(`Unhandled request: ${method} ${url.pathname}`);
-    });
+            service_name: "Payments API",
+            events: [],
+            runbooks: [],
+            rca: null,
+          });
+        }
+        throw new Error(`Unhandled request: ${method} ${url.pathname}`);
+      },
+    );
     vi.stubGlobal("fetch", fetchMock);
 
     render(<App />);
 
     fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
 
-    expect(await screen.findByText("Incident Dashboard")).toBeInTheDocument();
-    expect(await screen.findByText(/#42 Checkout timeout/)).toBeInTheDocument();
+    expect(await screen.findByText("Incident queue")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: /INC-0042.*Checkout timeout/ }),
+    ).toBeInTheDocument();
+    fireEvent.change(
+      screen.getByRole("searchbox", { name: "Search incidents" }),
+      { target: { value: "no matching incident" } },
+    );
+    expect(
+      screen.queryByRole("button", { name: /INC-0042.*Checkout timeout/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText("No incidents match these filters."),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Reset" }));
+    expect(
+      screen.getByRole("button", { name: /INC-0042.*Checkout timeout/ }),
+    ).toBeInTheDocument();
   });
 
   it("transitions a resolved incident to closed from the detail panel", async () => {
@@ -106,30 +140,66 @@ describe("App integration", () => {
     let status = "Resolved";
     let closedAt: string | null = null;
 
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = new URL(typeof input === "string" ? input : input.toString());
-      const method = init?.method ?? "GET";
-      const path = normalizePath(url.pathname);
+    const fetchMock = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = new URL(
+          typeof input === "string" ? input : input.toString(),
+        );
+        const method = init?.method ?? "GET";
+        const path = normalizePath(url.pathname);
 
-      if (path === "/users") {
-        return jsonResponse([{ id: 1, name: "Jordan Patel", username: "jordan", role: "incident_commander" }]);
-      }
-      if (path === "/services") {
-        return jsonResponse([{ id: 10, name: "Payments API", owner_team: "Core Payments", sla_policy: {} }]);
-      }
-      if (path === "/metrics") {
-        return jsonResponse({
-          total_incidents: 1,
-          open_incidents: 0,
-          closed_incidents: 0,
-          mtta_minutes: 2,
-          mttr_minutes: 15,
-          breach_rate: 0,
-        });
-      }
-      if (path === "/incidents" && method === "GET") {
-        return jsonResponse([
-          {
+        if (path === "/users") {
+          return jsonResponse([
+            {
+              id: 1,
+              name: "Jordan Patel",
+              username: "jordan",
+              role: "incident_commander",
+            },
+          ]);
+        }
+        if (path === "/services") {
+          return jsonResponse([
+            {
+              id: 10,
+              name: "Payments API",
+              owner_team: "Core Payments",
+              sla_policy: {},
+            },
+          ]);
+        }
+        if (path === "/metrics") {
+          return jsonResponse({
+            total_incidents: 1,
+            open_incidents: 0,
+            closed_incidents: 0,
+            mtta_minutes: 2,
+            mttr_minutes: 15,
+            breach_rate: 0,
+          });
+        }
+        if (path === "/incidents" && method === "GET") {
+          return jsonResponse([
+            {
+              id: 1,
+              title: "Resolved incident pending closure",
+              description: "Done",
+              severity: "SEV2",
+              status,
+              service_id: 10,
+              assignee_id: 1,
+              created_at: new Date().toISOString(),
+              acknowledged_at: new Date().toISOString(),
+              resolved_at: new Date().toISOString(),
+              closed_at: closedAt,
+              sla_deadline: new Date(Date.now() + 3600_000).toISOString(),
+              sla_hours: 2,
+              sla_breached: false,
+            },
+          ]);
+        }
+        if (path === "/incidents/1" && method === "GET") {
+          return jsonResponse({
             id: 1,
             title: "Resolved incident pending closure",
             description: "Done",
@@ -144,69 +214,55 @@ describe("App integration", () => {
             sla_deadline: new Date(Date.now() + 3600_000).toISOString(),
             sla_hours: 2,
             sla_breached: false,
-          },
-        ]);
-      }
-      if (path === "/incidents/1" && method === "GET") {
-        return jsonResponse({
-          id: 1,
-          title: "Resolved incident pending closure",
-          description: "Done",
-          severity: "SEV2",
-          status,
-          service_id: 10,
-          assignee_id: 1,
-          created_at: new Date().toISOString(),
-          acknowledged_at: new Date().toISOString(),
-          resolved_at: new Date().toISOString(),
-          closed_at: closedAt,
-          sla_deadline: new Date(Date.now() + 3600_000).toISOString(),
-          sla_hours: 2,
-          sla_breached: false,
-          service_name: "Payments API",
-          events: [],
-          runbooks: [],
-          rca: {
-            id: 99,
-            incident_id: 1,
-            root_cause: "Known root cause",
-            contributing_factors: "Known factor",
-            corrective_actions: "Known correction",
-            prevention_actions: "Known prevention",
-          },
-        });
-      }
-      if (path === "/incidents/1/status" && method === "POST") {
-        status = "Closed";
-        closedAt = new Date().toISOString();
-        return jsonResponse({
-          id: 1,
-          title: "Resolved incident pending closure",
-          description: "Done",
-          severity: "SEV2",
-          status,
-          service_id: 10,
-          assignee_id: 1,
-          created_at: new Date().toISOString(),
-          acknowledged_at: new Date().toISOString(),
-          resolved_at: new Date().toISOString(),
-          closed_at: closedAt,
-          sla_deadline: new Date(Date.now() + 3600_000).toISOString(),
-          sla_hours: 2,
-          sla_breached: false,
-        });
-      }
-      throw new Error(`Unhandled request: ${method} ${url.pathname}`);
-    });
+            service_name: "Payments API",
+            events: [],
+            runbooks: [],
+            rca: {
+              id: 99,
+              incident_id: 1,
+              root_cause: "Known root cause",
+              contributing_factors: "Known factor",
+              corrective_actions: "Known correction",
+              prevention_actions: "Known prevention",
+            },
+          });
+        }
+        if (path === "/incidents/1/status" && method === "POST") {
+          status = "Closed";
+          closedAt = new Date().toISOString();
+          return jsonResponse({
+            id: 1,
+            title: "Resolved incident pending closure",
+            description: "Done",
+            severity: "SEV2",
+            status,
+            service_id: 10,
+            assignee_id: 1,
+            created_at: new Date().toISOString(),
+            acknowledged_at: new Date().toISOString(),
+            resolved_at: new Date().toISOString(),
+            closed_at: closedAt,
+            sla_deadline: new Date(Date.now() + 3600_000).toISOString(),
+            sla_hours: 2,
+            sla_breached: false,
+          });
+        }
+        throw new Error(`Unhandled request: ${method} ${url.pathname}`);
+      },
+    );
     vi.stubGlobal("fetch", fetchMock);
 
     render(<App />);
 
-    const closeButton = await screen.findByRole("button", { name: /Move to Closed/i });
+    const closeButton = await screen.findByRole("button", {
+      name: /Move to Closed/i,
+    });
     fireEvent.click(closeButton);
 
     await waitFor(() => {
-      expect(screen.queryByRole("button", { name: /Move to Closed/i })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /Move to Closed/i }),
+      ).not.toBeInTheDocument();
     });
   });
 });

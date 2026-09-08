@@ -10,7 +10,9 @@ A production-grade incident management console implementing real SRE workflows:
 Live demo (hosted on Render): [https://incident-console-ui.onrender.com/](https://incident-console-ui.onrender.com/)
 > ⚠️ First load may take 30–60 seconds — hosted on Render's free tier.
 
-![Production Support Incident Console Dashboard](./docs/images/dashboard.png)
+![Incident desk with searchable queue, filters, SLA status and a selected incident runbook](./docs/images/dashboard.png)
+
+*Redesigned local demo, captured 8 September 2026 at 2× resolution using synthetic data. Times shown in Australia/Sydney.*
 
 ## Why I Built This
 
