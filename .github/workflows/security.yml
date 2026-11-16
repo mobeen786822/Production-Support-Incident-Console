@@ -202,12 +202,14 @@ jobs:
                   return None, "invalid"
 
           failures = []
+          outcomes = {"gitleaks": "${{ steps.gitleaks.outcome }}", "bandit": "${{ steps.bandit.outcome }}", "pip-audit": "${{ steps.pip_audit.outcome }}", "npm-audit": "${{ steps.npm_audit.outcome }}"}
+          failures.extend(f"{scan}: {outcome}" for scan, outcome in outcomes.items() if outcome != "success")
           read_notes = []
 
           # Gitleaks: fail on any findings
           gitleaks_data, gitleaks_state = load_json("gitleaks-report.json")
           if gitleaks_state != "ok":
-              read_notes.append(f"gitleaks-report.json: {gitleaks_state}, treating as 0 findings")
+              failures.append(f"gitleaks-report.json: {gitleaks_state}")
           gitleaks_findings = len(gitleaks_data) if isinstance(gitleaks_data, list) else 0
           if gitleaks_findings > 0:
               failures.append(
@@ -217,7 +219,7 @@ jobs:
           # Bandit: fail on HIGH findings only
           bandit_data, bandit_state = load_json("bandit-report.json")
           if bandit_state != "ok":
-              read_notes.append(f"bandit-report.json: {bandit_state}, treating as 0 findings")
+              failures.append(f"bandit-report.json: {bandit_state}")
           bandit_high = len(bandit_data.get("results", [])) if isinstance(bandit_data, dict) else 0
           if bandit_high > 0:
               failures.append(f"Bandit HIGH findings: {bandit_high}")
@@ -225,7 +227,7 @@ jobs:
           # pip-audit: fail on any vulnerabilities
           pip_data, pip_state = load_json("pip-audit-report.json")
           if pip_state != "ok":
-              read_notes.append(f"pip-audit-report.json: {pip_state}, treating as 0 findings")
+              failures.append(f"pip-audit-report.json: {pip_state}")
           pip_vulns = 0
           if isinstance(pip_data, dict):
               for dep in pip_data.get("dependencies", []):
@@ -245,7 +247,7 @@ jobs:
           # npm audit: fail on high/critical vulnerabilities
           npm_data, npm_state = load_json("npm-audit-report.json")
           if npm_state != "ok":
-              read_notes.append(f"npm-audit-report.json: {npm_state}, treating as 0 findings")
+              failures.append(f"npm-audit-report.json: {npm_state}")
           npm_high = 0
           npm_critical = 0
           if isinstance(npm_data, dict):
